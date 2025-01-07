@@ -48,9 +48,10 @@ def classify_layers(dockerfile_ast, dockerfile_dir):
 
     for instruction in dockerfile_ast:
         cmd = instruction['instruction'].lower()
+
+        # 处理 FROM 指令，检测语言类型
         if cmd == 'from':
             os_layer.append(instruction)
-            # Detect language from base image
             base_image = instruction['value'].lower()
             if 'python' in base_image:
                 language_layer.append({'instruction': 'LANGUAGE', 'value': 'python'})
@@ -67,61 +68,58 @@ def classify_layers(dockerfile_ast, dockerfile_dir):
             elif 'ruby' in base_image:
                 language_layer.append({'instruction': 'LANGUAGE', 'value': 'ruby'})
                 language_detected = True
-            # Removed generic C detection from here
+
+        # 处理 RUN 指令
         elif cmd == 'run':
-            # Detect language from RUN instructions if not detected from FROM
-            if not language_detected:
-                if 'openjdk' in instruction['value'].lower() or 'java' in instruction['value'].lower():
-                    language_layer.append({'instruction': 'LANGUAGE', 'value': 'java'})
-                    language_detected = True
-                elif 'python' in instruction['value'].lower():
-                    language_layer.append({'instruction': 'LANGUAGE', 'value': 'python'})
-                    language_detected = True
-                elif 'node' in instruction['value'].lower():
-                    language_layer.append({'instruction': 'LANGUAGE', 'value': 'nodejs'})
-                    language_detected = True
-                elif 'golang' in instruction['value'].lower():
-                    language_layer.append({'instruction': 'LANGUAGE', 'value': 'golang'})
-                    language_detected = True
-                elif 'ruby' in instruction['value'].lower():
-                    language_layer.append({'instruction': 'LANGUAGE', 'value': 'ruby'})
-                    language_detected = True
-                # Detect C only if no other language is detected
-                elif not language_detected and ('gcc' in instruction['value'].lower() or 'make' in instruction['value'].lower() or 'cmake' in instruction['value'].lower()):
-                    language_layer.append({'instruction': 'LANGUAGE', 'value': 'c'})
-                    language_detected = True
-            
-            # Handle dependencies layer
-            if 'install' in instruction['value']:
-               # dependencies_layer.append(instruction)
-                match = re.search(r'-r\s+(\S+)', instruction['value'])
-                req_file = None  # Initialize req_file with None
+            # 检查 apt-get install 指令
+            if 'apt-get install' in instruction['value']:
+                # 提取要安装的包
+                match = re.search(r'apt-get install\s+-y\s+(.+?)(\s+&&.*|$)', instruction['value'])
                 if match:
-                    req_file = os.path.join(dockerfile_dir, match.group(1))
-                else:
-                    # Check for specific language dependency files
-                    if 'pip' in instruction['value']:
-                        req_file = os.path.join(dockerfile_dir, 'requirements.txt')
-                    elif 'npm' in instruction['value']:
-                        req_file = os.path.join(dockerfile_dir, 'package.json')
-                    elif 'maven' in instruction['value']:
-                        req_file = os.path.join(dockerfile_dir, 'pom.xml')
-                    elif 'gradle' in instruction['value']:
-                        req_file = os.path.join(dockerfile_dir, 'build.gradle')
-                    elif 'make' in instruction['value'] or 'gcc' in instruction['value']:
-                        req_file = os.path.join(dockerfile_dir, 'Makefile')
+                    packages = match.group(1)
+                    # 分离包列表，移除不需要的清理命令
+                    package_list = re.split(r'\s+', packages)
+                    for pkg in package_list:
+                        pkg = pkg.strip()
+                        # 忽略清理命令
+                        if pkg == 'rm' or pkg == '&&':
+                            continue
+                        # 如果是语言相关的包，放到语言层
+                        if 'python' in pkg or 'pip' in pkg:
+                            language_layer.append({'instruction': 'LANGUAGE', 'value': pkg})
+                        elif 'java' in pkg:
+                            language_layer.append({'instruction': 'LANGUAGE', 'value': 'java'})
+                        else:
+                            # 否则放到依赖层
+                            dependencies_layer.append({'instruction': 'DEPENDENCY', 'value': pkg})
 
-                if req_file and os.path.exists(req_file):
-                    requirements_files.append(req_file)
+            # 拆分多个命令
+            if '&&' in instruction['value']:
+                commands = instruction['value'].split('&&')
+                for cmd in commands:
+                    cmd = cmd.strip()
+                    if cmd:
+                        new_instruction = instruction.copy()
+                        new_instruction['value'] = cmd
+                        dockerfile_ast.append(new_instruction)
+            else:
+                final_operations_layer.append(instruction)
 
+        # 处理其他指令
         elif cmd in ['copy', 'add', 'env', 'cmd', 'entrypoint', 'workdir']:
             final_operations_layer.append(instruction)
-    
-    # Default to 'unknown' if language still not detected
+
+    # 默认语言为 C
     if not language_detected:
         language_layer.append({'instruction': 'LANGUAGE', 'value': 'c'})
-    
+
     return os_layer, language_layer, dependencies_layer, final_operations_layer, requirements_files
+
+
+
+
+
+
 
 def normalize_version(version):
     return [int(part) for part in re.split(r'\D+', version) if part.isdigit()]
