@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dockerfile and Dependencies Analysis</title>
+</head>
+<body>
+    <h1>Upload Folder with Dockerfile and Dependencies</h1>
+
+    <!-- Folder upload -->
+    <form id="folder-form" enctype="multipart/form-data">
+        <label for="folder">Upload Folder (Dockerfile and dependencies):</label>
+        <input type="file" id="folder" webkitdirectory>
+        <button type="submit">Analyze Folder</button>
+    </form>
+
+    <hr>
+
+    <!-- Display results -->
+    <h2>Analysis Results:</h2>
+    <pre id="result"></pre>
+
+    <script>
+        // Handle folder upload
+        document.getElementById('folder-form').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            const inputElement = document.getElementById('folder');
+            const files = inputElement.files;
+            const formData = new FormData();
+
+            // Append all files in the folder
+            Array.from(files).forEach(file => {
+                const relativePath = file.webkitRelativePath || file.name; // Ensure relative path is preserved
+                formData.append('folder_files', file, relativePath);
+            });
+
+            fetch('/analyze', { // Backend endpoint to handle folder uploads
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                document.getElementById('result').textContent = `Error: ${error.message}`;
+            });
+        });
+    </script>
+</body>
+</html>

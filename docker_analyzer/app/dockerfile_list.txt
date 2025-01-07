@@ -1,0 +1,1 @@
+/home/comp/csxtchen/group/dockerfile_analyzer/binnacle-icse2020/datasets/3-phase-3-dockerfile-asts/generate/Dockerfile
