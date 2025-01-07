@@ -65,49 +65,60 @@ def parse_pom_dependencies(pom_file):
     try:
         tree = ET.parse(pom_file)
         root = tree.getroot()
+        # Maven POM 文件的命名空间
         namespace = {'maven': 'http://maven.apache.org/POM/4.0.0'}
+        
         dependencies = []
+        # 打印 XML 内容来调试
+        print(ET.tostring(root, encoding='unicode'))
+        
+        # 解析所有 <maven:dependency> 元素
         for dependency in root.findall('.//maven:dependency', namespace):
             group_id = dependency.find('maven:groupId', namespace)
             artifact_id = dependency.find('maven:artifactId', namespace)
             version = dependency.find('maven:version', namespace)
-            dep_str = f"{group_id.text}:{artifact_id.text}"
-            if version is not None:
-                dep_str += f":{version.text}"
-            dependencies.append(dep_str)
+            
+            if group_id is not None and artifact_id is not None:
+                dep_str = f"{group_id.text}:{artifact_id.text}"
+                if version is not None:
+                    dep_str += f":{version.text}"
+                dependencies.append(dep_str)
+        
         return dependencies
     except Exception as e:
         raise ValueError(f"Failed to parse pom.xml: {str(e)}")
 
 
-def filter_dependencies(language, raw_dependencies):
-    """根据语言类型清理依赖信息"""
-    filtered = []
-    if language == "python":
-        for dep in raw_dependencies:
-            if "==" in dep:
-                filtered.append(dep.strip())
-    elif language == "nodejs":
-        try:
-            package_json = json.loads("\n".join(raw_dependencies))
-            if "dependencies" in package_json:
-                for dep, version in package_json["dependencies"].items():
-                    filtered.append(f"{dep}@{version}")
-        except json.JSONDecodeError:
-            pass
-    elif language == "java":
-        for dep in raw_dependencies:
-            if dep.endswith('.xml') and dep.endswith('pom.xml'):
-                try:
-                    pom_deps = parse_pom_dependencies(dep)
-                    filtered.extend(pom_deps)
-                except ValueError as e:
-                    print(f"Warning: {e}")
-    else:
-        for dep in raw_dependencies:
-            if dep.strip():
-                filtered.append(dep.strip())
-    return filtered
+
+
+# def filter_dependencies(language, raw_dependencies):
+#     """根据语言类型清理依赖信息"""
+#     filtered = []
+#     if language == "python":
+#         for dep in raw_dependencies:
+#             if "==" in dep:
+#                 filtered.append(dep.strip())
+#     elif language == "nodejs":
+#         try:
+#             package_json = json.loads("\n".join(raw_dependencies))
+#             if "dependencies" in package_json:
+#                 for dep, version in package_json["dependencies"].items():
+#                     filtered.append(f"{dep}@{version}")
+#         except json.JSONDecodeError:
+#             pass
+#     elif language == "java":
+#         for dep in raw_dependencies:
+#             if dep.endswith('.xml') and dep.endswith('pom.xml'):
+#                 try:
+#                     pom_deps = parse_pom_dependencies(dep)
+#                     filtered.extend(pom_deps)
+#                 except ValueError as e:
+#                     print(f"Warning: {e}")
+#     else:
+#         for dep in raw_dependencies:
+#             if dep.strip():
+#                 filtered.append(dep.strip())
+#     return filtered
 
 
 def get_files_from_folder(folder_path):
