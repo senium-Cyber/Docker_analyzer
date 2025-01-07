@@ -93,7 +93,7 @@ def classify_layers(dockerfile_ast, dockerfile_dir):
             
             # Handle dependencies layer
             if 'install' in instruction['value']:
-                dependencies_layer.append(instruction)
+               # dependencies_layer.append(instruction)
                 match = re.search(r'-r\s+(\S+)', instruction['value'])
                 req_file = None  # Initialize req_file with None
                 if match:
