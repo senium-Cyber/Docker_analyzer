@@ -69,9 +69,30 @@ def classify_layers(dockerfile_ast, dockerfile_dir):
                 language_layer.append({'instruction': 'LANGUAGE', 'value': 'ruby'})
                 language_detected = True
 
-        # 处理 RUN 指令
+        # 处理 RUN 指令，检测语言和依赖项
         elif cmd == 'run':
-            # 检查 apt-get install 指令
+            # 如果语言没有在 FROM 指令中检测到，则尝试从 RUN 指令中检测
+            if not language_detected:
+                if 'openjdk' in instruction['value'].lower() or 'java' in instruction['value'].lower():
+                    language_layer.append({'instruction': 'LANGUAGE', 'value': 'java'})
+                    language_detected = True
+                elif 'python' in instruction['value'].lower():
+                    language_layer.append({'instruction': 'LANGUAGE', 'value': 'python'})
+                    language_detected = True
+                elif 'node' in instruction['value'].lower():
+                    language_layer.append({'instruction': 'LANGUAGE', 'value': 'nodejs'})
+                    language_detected = True
+                elif 'golang' in instruction['value'].lower():
+                    language_layer.append({'instruction': 'LANGUAGE', 'value': 'golang'})
+                    language_detected = True
+                elif 'ruby' in instruction['value'].lower():
+                    language_layer.append({'instruction': 'LANGUAGE', 'value': 'ruby'})
+                    language_detected = True
+                elif not language_detected and ('gcc' in instruction['value'].lower() or 'make' in instruction['value'].lower() or 'cmake' in instruction['value'].lower()):
+                    language_layer.append({'instruction': 'LANGUAGE', 'value': 'c'})
+                    language_detected = True
+
+            # 处理 apt-get install 指令，将其归类到 dependencies_layer
             if 'apt-get install' in instruction['value']:
                 # 提取要安装的包
                 match = re.search(r'apt-get install\s+-y\s+(.+?)(\s+&&.*|$)', instruction['value'])
@@ -87,34 +108,64 @@ def classify_layers(dockerfile_ast, dockerfile_dir):
                         # 如果是语言相关的包，放到语言层
                         if 'python' in pkg or 'pip' in pkg:
                             language_layer.append({'instruction': 'LANGUAGE', 'value': pkg})
-                        elif 'java' in pkg:
-                            language_layer.append({'instruction': 'LANGUAGE', 'value': 'java'})
                         else:
                             # 否则放到依赖层
                             dependencies_layer.append({'instruction': 'DEPENDENCY', 'value': pkg})
+            
+            # 处理其他依赖项文件的提取
+            elif 'install' in instruction['value']:
+                req_file = None  # 确保每次检查时都初始化 req_file
 
-            # 拆分多个命令
+                # 通过正则表达式检测是否有指定依赖文件
+                match = re.search(r'-r\s+(\S+)', instruction['value'])
+                if match:
+                    req_file = match.group(1)
+                else:
+                    # 检查常见的依赖文件名
+                    if 'pip' in instruction['value']:
+                        req_file = 'requirements.txt'
+                    elif 'npm' in instruction['value']:
+                        req_file = 'package.json'
+                    elif 'maven' in instruction['value']:
+                        req_file = 'pom.xml'
+                    elif 'gradle' in instruction['value']:
+                        req_file = 'build.gradle'
+                    elif 'make' in instruction['value'] or 'gcc' in instruction['value']:
+                        req_file = 'Makefile'
+
+                # 如果发现了有效的依赖文件路径，则检查文件是否存在
+                if req_file:
+                    req_file_path = os.path.join(dockerfile_dir, req_file)
+                    if os.path.exists(req_file_path):
+                        requirements_files.append(req_file_path)
+                    else:
+                        print(f"File does not exist: {req_file_path}")
+                # 检查是否遇到目录而非文件
+                if os.path.isdir(req_file):
+                    print(f"Expected file, but found directory: {req_file}")
+
+            # 处理 RUN 指令中的 &&，将其拆分成独立的命令执行
             if '&&' in instruction['value']:
                 commands = instruction['value'].split('&&')
                 for cmd in commands:
-                    cmd = cmd.strip()
-                    if cmd:
+                    cmd = cmd.strip()  # 去除每个命令两边的空格
+                    if cmd:  # 确保命令非空
+                        # 创建新的 RUN 指令
                         new_instruction = instruction.copy()
                         new_instruction['value'] = cmd
                         dockerfile_ast.append(new_instruction)
             else:
                 final_operations_layer.append(instruction)
 
-        # 处理其他指令
+        # 处理 COPY、ADD、ENV、CMD 等操作指令
         elif cmd in ['copy', 'add', 'env', 'cmd', 'entrypoint', 'workdir']:
             final_operations_layer.append(instruction)
 
-    # 默认语言为 C
+    # 默认语言为 C，防止没有检测到语言
     if not language_detected:
         language_layer.append({'instruction': 'LANGUAGE', 'value': 'c'})
 
     return os_layer, language_layer, dependencies_layer, final_operations_layer, requirements_files
-
 
 
 
