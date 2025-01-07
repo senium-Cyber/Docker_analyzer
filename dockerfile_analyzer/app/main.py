@@ -14,23 +14,51 @@ def merge_dependencies(dependencies):
     """合并依赖项，保留相同包名的最新版本"""
     dep_dict = {}
     for dep in dependencies:
-        if ":" in dep:
-            name, version = dep.rsplit(":", 1)
+        if "==" in dep:
+            name, version = dep.split("==")
+        elif ":" in dep:
+            name, version = dep.split(":")
         elif "@" in dep:
-            name, version = dep.rsplit("@", 1)
+            name, version = dep.split("@")
         else:
             name, version = dep, None
 
-        # 如果已经存在，则比较版本号（假设版本号能按字符串排序）
         if name in dep_dict:
             if version and (dep_dict[name] is None or version > dep_dict[name]):
                 dep_dict[name] = version
         else:
             dep_dict[name] = version
 
-    # 格式化为列表
-    return [f"{name}:{version}" if version else name for name, version in dep_dict.items()]
+    return [f"{name}=={version}" if version else name for name, version in dep_dict.items()]
 
+def filter_dependencies(language, raw_dependencies):
+    """根据语言类型清理依赖信息"""
+    filtered = []
+    if language == "python":
+        for dep in raw_dependencies:
+            if "==" in dep:
+                filtered.append(dep.strip())
+    elif language == "nodejs":
+        try:
+            package_json = json.loads("\n".join(raw_dependencies))
+            if "dependencies" in package_json:
+                for dep, version in package_json["dependencies"].items():
+                    filtered.append(f"{dep}=={version}")
+        except json.JSONDecodeError:
+            pass
+    elif language == "java":
+        for dep in raw_dependencies:
+            if dep.endswith('pom.xml'):
+                try:
+                    pom_deps = parse_pom_dependencies(dep)
+                    filtered.extend(pom_deps)
+                except ValueError as e:
+                    print(f"Warning: {e}")
+    else:
+        for dep in raw_dependencies:
+            if dep.strip():
+                filtered.append(dep.strip())
+    return filtered
 
 def parse_pom_dependencies(pom_file):
     """解析 pom.xml 文件并提取依赖项"""
