@@ -111,7 +111,19 @@ def classify_layers(dockerfile_ast, dockerfile_dir):
                         else:
                             # 否则放到依赖层
                             dependencies_layer.append({'instruction': 'DEPENDENCY', 'value': pkg})
-            
+            # 处理其他没有 apt-get 的情况，如 pip3 安装
+            elif 'pip3 install' in instruction['value'] or 'npm install' in instruction['value']:
+                # 提取安装的包
+                match = re.search(r'(pip3\s+install|npm\s+install)\s+(.+)', instruction['value'])
+                if match:
+                    packages = match.group(2)
+                    package_list = re.split(r'\s+', packages)
+                    for pkg in package_list:
+                        pkg = pkg.strip()
+                        # 将这些包添加到 dependencies_layer
+                        if pkg:
+                            dependencies_layer.append({'instruction': 'DEPENDENCY', 'value': pkg})
+
             # 处理其他依赖项文件的提取
             elif 'install' in instruction['value']:
                 req_file = None  # 确保每次检查时都初始化 req_file
