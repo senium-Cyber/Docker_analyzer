@@ -4,76 +4,70 @@ import os
 import json
 from tree6 import parse_dockerfile, classify_layers
 import xml.etree.ElementTree as ET
+import shutil
 app = Flask(__name__, static_folder='../static')
 UPLOAD_FOLDER = './app/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# 全局变量，用于存储上传的依赖文件路径
-uploaded_dependencies = []
+
 def parse_pom_dependencies(pom_file):
     """解析 pom.xml 文件并提取依赖项"""
     try:
         tree = ET.parse(pom_file)
         root = tree.getroot()
         namespace = {'maven': 'http://maven.apache.org/POM/4.0.0'}
-        
         dependencies = []
         for dependency in root.findall('.//maven:dependency', namespace):
             group_id = dependency.find('maven:groupId', namespace)
             artifact_id = dependency.find('maven:artifactId', namespace)
             version = dependency.find('maven:version', namespace)
-            
             dep_str = f"{group_id.text}:{artifact_id.text}"
             if version is not None:
                 dep_str += f":{version.text}"
             dependencies.append(dep_str)
-        
         return dependencies
     except Exception as e:
         raise ValueError(f"Failed to parse pom.xml: {str(e)}")
 
+
 def filter_dependencies(language, raw_dependencies):
-    """
-    根据语言类型清理依赖信息，只保留有效内容
-    :param language: 语言类型 (e.g., "python", "nodejs")
-    :param raw_dependencies: 原始依赖列表
-    :return: 清理后的有效依赖
-    """
+    """根据语言类型清理依赖信息"""
     filtered = []
     if language == "python":
         for dep in raw_dependencies:
-            if "==" in dep:  # 依赖格式如 Flask==2.1.1
+            if "==" in dep:
                 filtered.append(dep.strip())
     elif language == "nodejs":
         try:
-            # 试图解析为 JSON 格式，并进一步提取 dependencies
             package_json = json.loads("\n".join(raw_dependencies))
             if "dependencies" in package_json:
                 for dep, version in package_json["dependencies"].items():
                     filtered.append(f"{dep}@{version}")
         except json.JSONDecodeError:
-            pass  # 如果解析失败，忽略此部分
+            pass
+    elif language == "java":
+        for dep in raw_dependencies:
+            if dep.endswith('.xml') and dep.endswith('pom.xml'):
+                try:
+                    pom_deps = parse_pom_dependencies(dep)
+                    filtered.extend(pom_deps)
+                except ValueError as e:
+                    print(f"Warning: {e}")
     else:
-        if language == "java":
-                for dep in raw_dependencies:
-                        if dep.endswith('.txt') or dep.endswith('.json') or dep.endswith('.xml'):
-                            # 检查文件类型并解析
-                            if dep.endswith('pom.xml'):
-                                try:
-                                    pom_deps = parse_pom_dependencies(dep)
-                                    filtered.extend(pom_deps)
-                                except ValueError as e:
-                                    print(f"Warning: {e}")
-                            else:
-                                # 忽略无关的依赖文件内容
-                                continue
-        else :
-            for dep in raw_dependencies:
-                if dep.strip():
-                    filtered.append(dep.strip())
-                    
+        for dep in raw_dependencies:
+            if dep.strip():
+                filtered.append(dep.strip())
     return filtered
+
+
+def get_files_from_folder(folder_path):
+    """递归获取文件夹中的所有文件"""
+    file_list = []
+    for root, _, files in os.walk(folder_path):
+        for file in files:
+            file_list.append(os.path.join(root, file))
+    return file_list
 
 
 @app.route('/')
@@ -83,25 +77,36 @@ def serve_frontend():
 
 @app.route('/analyze', methods=['POST'])
 def analyze_dockerfile():
-    if 'file' not in request.files:
-        return jsonify({"error": "No Dockerfile provided"}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "No Dockerfile selected"}), 400
-
-    filename = secure_filename(file.filename)
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(filepath)
-
     try:
-        # Parse and classify Dockerfile
-        dockerfile_ast = parse_dockerfile(filepath)
-        os_layer, language_layer, dependencies_layer, final_operations_layer, requirements_files = classify_layers(
-            dockerfile_ast, os.path.dirname(filepath)
+        # 检查是否有文件上传
+        if 'folder_files' not in request.files:
+            return jsonify({"error": "No files uploaded"}), 400
+
+        # 创建临时文件夹存储上传的文件
+        folder_path = os.path.join(app.config['UPLOAD_FOLDER'], 'temp_folder')
+        os.makedirs(folder_path, exist_ok=True)
+
+        # 保存所有上传的文件
+        files = request.files.getlist('folder_files')
+        for file in files:
+            relative_path = file.filename  # 获取相对路径
+            full_path = os.path.join(folder_path, relative_path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)  # 创建子目录
+            file.save(full_path)
+
+        # 查找 Dockerfile
+        all_files = get_files_from_folder(folder_path)
+        dockerfile_path = next((f for f in all_files if os.path.basename(f).lower() == 'dockerfile'), None)
+        if not dockerfile_path:
+            return jsonify({"error": "No Dockerfile found in the uploaded folder"}), 400
+
+        # 解析 Dockerfile
+        dockerfile_ast = parse_dockerfile(dockerfile_path)
+        os_layer, language_layer, dependencies_layer, final_operations_layer, _ = classify_layers(
+            dockerfile_ast, os.path.dirname(dockerfile_path)
         )
 
-        # 初始化返回结果
+        # 初始化结果
         runtime_dependencies = [item['value'] for item in dependencies_layer]
         result = {
             "OS": [item['value'] for item in os_layer],
@@ -110,61 +115,41 @@ def analyze_dockerfile():
             "Missing dependencies": [],
         }
 
-        # 验证上传的依赖文件
+        # 验证依赖文件是否存在
         required_files = {
             "python": "requirements.txt",
             "nodejs": "package.json",
             "java": "pom.xml",
         }
-
         for lang in [item['value'] for item in language_layer]:
             required_file = required_files.get(lang)
-            if required_file and required_file not in [os.path.basename(f) for f in uploaded_dependencies]:
+            if required_file and not any(os.path.basename(f) == required_file for f in all_files):
                 result["Missing dependencies"].append(required_file)
 
+        # 如果缺少依赖文件
         if result["Missing dependencies"]:
             return jsonify({"error": "Missing runtime dependency files", "missing_files": result["Missing dependencies"]}), 400
 
-        # 打开并解析上传的依赖文件
-        for dep_file in uploaded_dependencies:
-            try:
-                with open(dep_file, 'r') as f:
-                    raw_dependencies = f.readlines()
-                    # 根据语言清理依赖
-                    for lang in [item['value'] for item in language_layer]:
-                        filtered_deps = filter_dependencies(lang, raw_dependencies)
-                        runtime_dependencies.extend([dep for dep in filtered_deps if dep not in runtime_dependencies])
-            except Exception as e:
-                return jsonify({"error": f"Error reading dependency file {dep_file}: {str(e)}"}), 500
+        # 解析并清理依赖
+        for file in all_files:
+            if os.path.basename(file) in required_files.values():
+                try:
+                    with open(file, 'r') as f:
+                        raw_dependencies = f.readlines()
+                        for lang in [item['value'] for item in language_layer]:
+                            filtered_deps = filter_dependencies(lang, raw_dependencies)
+                            runtime_dependencies.extend([dep for dep in filtered_deps if dep not in runtime_dependencies])
+                except Exception as e:
+                    return jsonify({"error": f"Error reading dependency file {file}: {str(e)}"}), 500
 
-        # 更新结果中的 Runtime dependencies
+        # 更新结果
         result["Runtime dependencies"] = runtime_dependencies
-
+        shutil.rmtree(folder_path)
         return jsonify(result)
 
     except Exception as e:
+        shutil.rmtree(folder_path, ignore_errors=True)
         return jsonify({"error": str(e)}), 500
-
-
-@app.route('/upload_dependencies', methods=['POST'])
-def upload_dependencies():
-    if 'dependencies' not in request.files:
-        return jsonify({"error": "No dependencies files provided"}), 400
-
-    files = request.files.getlist('dependencies')
-    uploaded_files = []
-
-    for file in files:
-        if file.filename == '':
-            return jsonify({"error": "File name is empty"}), 400
-
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        uploaded_files.append(filepath)
-        uploaded_dependencies.append(filepath)  # 添加到全局列表
-
-    return jsonify({"message": "Dependencies uploaded successfully", "uploaded_files": uploaded_files}), 200
 
 
 if __name__ == '__main__':
