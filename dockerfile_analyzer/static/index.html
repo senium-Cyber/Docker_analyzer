@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dockerfile Analysis</title>
+</head>
+<body>
+    <h1>Upload Dockerfile and Dependencies</h1>
+    
+    <!-- Dockerfile upload -->
+    <form id="dockerfile-form" enctype="multipart/form-data">
+        <label for="dockerfile">Upload Dockerfile:</label>
+        <input type="file" name="file" id="dockerfile" accept=".Dockerfile,.txt">
+        <button type="submit">Analyze Dockerfile</button>
+    </form>
+
+    <hr>
+
+    <!-- Dependency files upload -->
+    <form id="dependencies-form" enctype="multipart/form-data">
+        <label for="dependencies">Upload Dependencies (multiple files):</label>
+        <input type="file" name="dependencies" id="dependencies" multiple directory>
+        <button type="submit">Upload Dependencies</button>
+    </form>
+
+    <hr>
+
+    <!-- Display results here -->
+    <h2>Analysis Results:</h2>
+    <pre id="result"></pre>
+
+    <script>
+        // Handle Dockerfile upload
+        document.getElementById('dockerfile-form').addEventListener('submit', function (event) {
+            event.preventDefault();
+            const formData = new FormData();
+            formData.append('file', document.getElementById('dockerfile').files[0]);
+
+            fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                document.getElementById('result').textContent = `Error: ${error.message}`;
+            });
+        });
+
+        // Handle Dependency files upload
+        document.getElementById('dependencies-form').addEventListener('submit', function (event) {
+            event.preventDefault();
+            const formData = new FormData();
+            const files = document.getElementById('dependencies').files;
+            Array.from(files).forEach(file => {
+                formData.append('dependencies', file);
+            });
+
+            fetch('/upload_dependencies', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                document.getElementById('result').textContent = `Error: ${error.message}`;
+            });
+        });
+    </script>
+</body>
+</html>
