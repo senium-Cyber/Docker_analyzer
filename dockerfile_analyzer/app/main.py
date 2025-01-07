@@ -10,6 +10,27 @@ UPLOAD_FOLDER = './app/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+def merge_dependencies(dependencies):
+    """合并依赖项，保留相同包名的最新版本"""
+    dep_dict = {}
+    for dep in dependencies:
+        if ":" in dep:
+            name, version = dep.rsplit(":", 1)
+        elif "@" in dep:
+            name, version = dep.rsplit("@", 1)
+        else:
+            name, version = dep, None
+
+        # 如果已经存在，则比较版本号（假设版本号能按字符串排序）
+        if name in dep_dict:
+            if version and (dep_dict[name] is None or version > dep_dict[name]):
+                dep_dict[name] = version
+        else:
+            dep_dict[name] = version
+
+    # 格式化为列表
+    return [f"{name}:{version}" if version else name for name, version in dep_dict.items()]
+
 
 def parse_pom_dependencies(pom_file):
     """解析 pom.xml 文件并提取依赖项"""
@@ -123,8 +144,19 @@ def analyze_dockerfile():
         }
         for lang in [item['value'] for item in language_layer]:
             required_file = required_files.get(lang)
-            if required_file and not any(os.path.basename(f) == required_file for f in all_files):
-                result["Missing dependencies"].append(required_file)
+            if required_file:
+                dependency_file = next((f for f in all_files if os.path.basename(f) == required_file), None)
+                if dependency_file:
+                    try:
+                        with open(dependency_file, 'r') as f:
+                            raw_dependencies = f.readlines()
+                            filtered_deps = filter_dependencies(lang, raw_dependencies)
+                            runtime_dependencies.extend(filtered_deps)
+                    except Exception as e:
+                        return jsonify({"error": f"Error reading dependency file {dependency_file}: {str(e)}"}), 500
+
+        # 合并依赖项
+        runtime_dependencies = merge_dependencies(runtime_dependencies)
 
         # 如果缺少依赖文件
         if result["Missing dependencies"]:
