@@ -3,63 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dockerfile Analysis</title>
+    <title>Dockerfile and Dependencies Analysis</title>
 </head>
 <body>
-    <h1>Upload Dockerfile and Dependencies</h1>
-    
-    <!-- Dockerfile upload -->
-    <form id="dockerfile-form" enctype="multipart/form-data">
-        <label for="dockerfile">Upload Dockerfile:</label>
-        <input type="file" name="file" id="dockerfile" accept=".Dockerfile,.txt">
-        <button type="submit">Analyze Dockerfile</button>
+    <h1>Upload Folder with Dockerfile and Dependencies</h1>
+
+    <!-- Folder upload -->
+    <form id="folder-form" enctype="multipart/form-data">
+        <label for="folder">Upload Folder (Dockerfile and dependencies):</label>
+        <input type="file" id="folder" webkitdirectory>
+        <button type="submit">Analyze Folder</button>
     </form>
 
     <hr>
 
-    <!-- Dependency files upload -->
-    <form id="dependencies-form" enctype="multipart/form-data">
-        <label for="dependencies">Upload Dependencies (multiple files):</label>
-        <input type="file" name="dependencies" id="dependencies" multiple directory>
-        <button type="submit">Upload Dependencies</button>
-    </form>
-
-    <hr>
-
-    <!-- Display results here -->
+    <!-- Display results -->
     <h2>Analysis Results:</h2>
     <pre id="result"></pre>
 
     <script>
-        // Handle Dockerfile upload
-        document.getElementById('dockerfile-form').addEventListener('submit', function (event) {
+        // Handle folder upload
+        document.getElementById('folder-form').addEventListener('submit', function (event) {
             event.preventDefault();
-            const formData = new FormData();
-            formData.append('file', document.getElementById('dockerfile').files[0]);
 
-            fetch('/analyze', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('result').textContent = JSON.stringify(data, null, 2);
-            })
-            .catch(error => {
-                document.getElementById('result').textContent = `Error: ${error.message}`;
-            });
-        });
-
-        // Handle Dependency files upload
-        document.getElementById('dependencies-form').addEventListener('submit', function (event) {
-            event.preventDefault();
+            const inputElement = document.getElementById('folder');
+            const files = inputElement.files;
             const formData = new FormData();
-            const files = document.getElementById('dependencies').files;
+
+            // Append all files in the folder
             Array.from(files).forEach(file => {
-                formData.append('dependencies', file);
+                const relativePath = file.webkitRelativePath || file.name; // Ensure relative path is preserved
+                formData.append('folder_files', file, relativePath);
             });
 
-            fetch('/upload_dependencies', {
+            fetch('/analyze', { // Backend endpoint to handle folder uploads
                 method: 'POST',
                 body: formData
             })
