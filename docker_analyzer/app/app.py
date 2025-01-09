@@ -118,20 +118,30 @@ def extract_layers(ast):
             for child in node.get('children', []):
                 if child['type'] == 'DOCKER-IMAGE-TAG' and not os_detected:
                     tag_value = child['value'].lower()
-                    os_list.append(tag_value)
-                    # Store the tag value temporarily for later combination
-                    detected_os_tag = tag_value
-                    os_detected = True
+                    # Identify OS from tag (e.g., alpine, ubuntu)
+                    if 'alpine' in tag_value:
+                        os_list.append('alpine')
+                        os_detected = True
+                    elif 'ubuntu' in tag_value:
+                        os_list.append('ubuntu')
+                        os_detected = True
+                    elif 'debian' in tag_value:
+                        os_list.append('debian')
+                        os_detected = True
+                    elif 'slim' in tag_value:
+                        os_list.append('debian-slim')
+                        os_detected = True
+                    elif 'centos' in tag_value:
+                        os_list.append('centos')
+                        os_detected = True
+                    elif 'fedora' in tag_value:
+                        os_list.append('fedora')
+                        os_detected = True
 
                 elif child['type'] == 'DOCKER-IMAGE-NAME' and not os_detected:
                     base_image = child['value'].lower()
                     if base_image in ['alpine', 'ubuntu', 'debian', 'centos', 'fedora']:
-                        if 'detected_os_tag' in locals():
-                            # Combine name and tag to form full OS version
-                            os_list.append(f"{base_image}:{detected_os_tag}")
-                            del detected_os_tag  # Remove the tag after use
-                        else:
-                            os_list.append(base_image)  # No tag, append only name
+                        os_list.append(base_image)
                         os_detected = True
 
                 # Detect language and version from base image
