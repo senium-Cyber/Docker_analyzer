@@ -84,8 +84,7 @@ def extract_requirements(dependencies_layer, folder_path):
         return True
 
 # 清理 dependencies_layer
-    dependencies_layer[:] = [dep for dep in dependencies_layer if is_valid_dependency(dep)]
-
+    dependencies_layer[:] = list(dict.fromkeys(dep for dep in dependencies_layer if is_valid_dependency(dep)))
 # 打印清理后的依赖
 #print(f"Dependencies_layer after cleanup: {dependencies_layer}")
 
