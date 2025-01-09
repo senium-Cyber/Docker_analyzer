@@ -208,7 +208,7 @@ def extract_layers(ast):
                 elif 'ruby' in run_command:
                     language_list.append('ruby')
                     language_detected = True
-                elif 'gcc' in  or 'g++' in run_command: run_command:
+                elif 'gcc' in run_command or 'g++' in run_command:
                     language_list.append('c')
                     language_detected = True
             # Extract dependencies from package installation commands
