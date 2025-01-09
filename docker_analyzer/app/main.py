@@ -57,15 +57,15 @@ def extract_requirements(dependencies_layer, folder_path):
                 print(f"Adding to dependencies: {dep.strip()}")
                 dependencies_layer.append(dep.strip())
 
-    # # 最后过滤无效项
-    # def is_valid_dependency(dep):
-    #     """检查依赖是否是合法的，不包含无效标记"""
-    #     invalid_keywords = ['requirements.txt', 'package.json', 'pom.xml', '@', '.xml']
-    #     return not any(keyword in dep.lower() for keyword in invalid_keywords)
+    # 最后过滤无效项
+    def is_valid_dependency(dep):
+        """检查依赖是否是合法的，不包含无效标记"""
+        invalid_keywords = ['requirements.txt', 'package.json', 'pom.xml', '@', '.xml','python3','python3-pip']
+        return not any(keyword in dep.lower() for keyword in invalid_keywords)
 
-    # #print(f"Filtering dependencies_layer before cleanup: {dependencies_layer}")
-    # dependencies_layer[:] = [dep for dep in dependencies_layer if is_valid_dependency(dep)]
-    #print(f"Dependencies_layer after cleanup: {dependencies_layer}")
+    #print(f"Filtering dependencies_layer before cleanup: {dependencies_layer}")
+    dependencies_layer[:] = [dep for dep in dependencies_layer if is_valid_dependency(dep)]
+    print(f"Dependencies_layer after cleanup: {dependencies_layer}")
 
 
 
