@@ -4,7 +4,7 @@ import os
 import json
 from app import process_dockerfile, extract_layers  # 引入函数
 import shutil
-
+import re
 app = Flask(__name__, static_folder='../static')
 UPLOAD_FOLDER = './app/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
