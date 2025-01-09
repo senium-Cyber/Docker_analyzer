@@ -143,9 +143,14 @@ def analyze_dockerfile():
 
         # 调用 extract_layers 提取层次信息
         os_layer, language_layer, dependencies_layer = extract_layers(dockerfile_ast)
-
+        
+        def deduplicate_layer(layer):  
+            return list(dict.fromkeys(layer))
+            
         # 提取并合并其他依赖项
         extract_requirements(dependencies_layer, folder_path)
+        os_layer = deduplicate_layer(os_layer)
+        language_layer = deduplicate_layer(language_layer)
 
         # 组装结果
         result = {
