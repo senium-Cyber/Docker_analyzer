@@ -132,7 +132,7 @@ def extract_layers(ast):
                     elif 'debian' in tag_value:
                         os_list.append('debian')
                         os_detected = True
-                     elif 'slim' in tag_value:
+                    elif 'slim' in tag_value:
                         os_list.append('debian-slim')
                         os_detected = True
                     elif 'centos' in tag_value:
