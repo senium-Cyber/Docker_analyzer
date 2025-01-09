@@ -125,7 +125,12 @@ def extract_layers(ast):
                 elif child['type'] == 'DOCKER-IMAGE-NAME' and not os_detected:
                     base_image = child['value'].lower()
                     if base_image in ['alpine', 'ubuntu', 'debian', 'centos', 'fedora']:
-                        os_list.append(base_image)
+                        if 'detected_os_tag' in locals():
+                            # Combine name and tag to form full OS version
+                            os_list.append(f"{base_image}:{detected_os_tag}")
+                            del detected_os_tag  # Remove the tag after use
+                        else:
+                            os_list.append(base_image)  # No tag, append only name
                         os_detected = True
 
                 # Detect language and version from base image
