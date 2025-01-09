@@ -103,8 +103,6 @@ def process_dockerfile(dockerfile_path):
 
 
 # Tree traversal to extract OS, Language, and Dependencies
-# Tree traversal to extract OS, Language, and Dependencies
-
 def extract_layers(ast):
     os_list = []
     language_list = []
@@ -117,34 +115,44 @@ def extract_layers(ast):
         # Extract OS from 'DOCKER-FROM'
         if node['type'] == 'DOCKER-FROM':
             os_detected = False
-            os_name = ""
-            os_version = ""
             for child in node.get('children', []):
-                if child['type'] == 'DOCKER-IMAGE-NAME' and not os_detected:
-                    base_image = child['value'].lower()
-                    if base_image in ['alpine', 'ubuntu', 'debian', 'centos', 'fedora']:
-                        os_name = base_image
+                if child['type'] == 'DOCKER-IMAGE-TAG' and not os_detected:
+                    tag_value = child['value'].lower()
+                    # Identify OS from tag (e.g., alpine, ubuntu)
+                    if 'alpine' in tag_value:
+                        os_list.append('alpine')
+                        os_detected = True
+                    elif 'ubuntu' in tag_value:
+                        os_list.append('ubuntu')
+                        os_detected = True
+                    elif 'debian' in tag_value:
+                        os_list.append('debian')
+                        os_detected = True
+                    elif 'slim' in tag_value:
+                        os_list.append('debian-slim')
+                        os_detected = True
+                    elif 'centos' in tag_value:
+                        os_list.append('centos')
+                        os_detected = True
+                    elif 'fedora' in tag_value:
+                        os_list.append('fedora')
                         os_detected = True
 
-                elif child['type'] == 'DOCKER-IMAGE-TAG' and os_name:
-                    tag_value = child['value'].lower()
-                    if any(version in tag_value for version in ['alpine', 'ubuntu', 'debian', 'slim']):
-                        os_version = tag_value
+                elif child['type'] == 'DOCKER-IMAGE-NAME' and not os_detected:
+                    base_image = child['value'].lower()
+                    if base_image in ['alpine', 'ubuntu', 'debian', 'centos', 'fedora']:
+                        os_list.append(base_image)
+                        os_detected = True
 
-            # Combine OS name and version if both are detected
-            if os_name:
-                os_combined = f"{os_name}:{os_version}" if os_version else os_name
-                os_list.append(os_combined)
-
-            # Detect language and version from base image
-            for child in node.get('children', []):
+                # Detect language and version from base image
                 if child['type'] == 'DOCKER-IMAGE-NAME':
                     base_image = child['value'].lower()
                     if 'python' in base_image:
+                        # Combine with tag for version detection
                         language_version = 'python'
                         if 'DOCKER-IMAGE-TAG' in [c['type'] for c in node.get('children', [])]:
                             tag_node = next(c for c in node['children'] if c['type'] == 'DOCKER-IMAGE-TAG')
-                            version = tag_node['value'].lower().split('-')[0]
+                            version = tag_node['value'].lower().split('-')[0]  # e.g., 3.9 from 3.9-alpine
                             language_version += version
                         language_list.append(language_version)
                         language_detected = True
@@ -172,7 +180,6 @@ def extract_layers(ast):
                             language_version += version
                         language_list.append(language_version)
                         language_detected = True
-
         # Extract dependencies from 'DOCKER-RUN'
         elif node['type'] == 'DOCKER-RUN':
             run_command = node['children'][0]['value'].lower()
@@ -187,6 +194,9 @@ def extract_layers(ast):
                         language_list.append('python3')
                     else:
                         language_list.append('python')
+                    language_detected = True
+                elif 'python3' in run_command:
+                    language_list.append('python3')
                     language_detected = True
                 elif 'node' in run_command:
                     language_list.append('nodejs')
@@ -204,6 +214,30 @@ def extract_layers(ast):
             if 'apt-get install' in run_command:
                 dependencies = re.findall(r'apt-get install\s+-y\s+([\w\s\-\.]+)', run_command)
                 dependencies_list.extend(dependencies)
+                # 检测可能的语言
+                for dep in dependencies:
+                    dep = dep.strip().lower()
+                    if 'python3' in dep or 'python' in dep:
+                        if 'python3-pip' in dep:  # 检查具体的 Python 工具链
+                            language_list.append('python3')
+                        else:
+                            language_list.append('python')
+                        language_detected = True
+                    elif 'nodejs' in dep or 'node' in dep:
+                        language_list.append('nodejs')
+                        language_detected = True
+                    elif 'openjdk' in dep or 'java' in dep:
+                        language_list.append('java')
+                        language_detected = True
+                    elif 'golang' in dep or 'go' in dep:
+                        language_list.append('golang')
+                        language_detected = True
+                    elif 'ruby' in dep:
+                        language_list.append('ruby')
+                        language_detected = True
+                    elif 'gcc' in dep or 'g++' in dep:
+                        language_list.append('c/c++')
+                        language_detected = True
             elif 'pip install' in run_command or 'pip3 install' in run_command:
                 dependencies = re.findall(r'pip(?:3)? install\s+([\w\s\-\.]+)', run_command)
                 dependencies_list.extend(dependencies)
@@ -213,7 +247,6 @@ def extract_layers(ast):
             elif 'gem install' in run_command:
                 dependencies = re.findall(r'gem install\s+([\w\s\-\.]+)', run_command)
                 dependencies_list.extend(dependencies)
-
         # Recursively traverse child nodes
         for child in node.get('children', []):
             traverse(child)
