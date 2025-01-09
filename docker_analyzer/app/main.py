@@ -11,24 +11,24 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def extract_requirements(dependencies_layer, folder_path):
-    """从 `requirements.txt`、`package.json` 和 `pom.xml` 提取依赖，并在最后过滤无效项"""
-
+    """从 requirements.txt、package.json 和 pom.xml 提取依赖"""
+    
     # 处理 requirements.txt 文件
-    requirements_path = os.path.join(folder_path, 'requirements.txt')
+    requirements_path = os.path.join(folder_path, 'requirements.txt')  # 确保路径是正确的
     if os.path.exists(requirements_path):
         print(f"Found requirements.txt at {requirements_path}")
         with open(requirements_path, 'r') as req_file:
             dependencies = req_file.readlines()
             for dep in dependencies:
                 dep = dep.strip()
-                print(f"Reading line: {dep}")  # 调试输出
-
-                # 简单验证格式是否正确并添加到列表
-                if re.match(r'^[a-zA-Z0-9_-]+==[0-9\.]+$', dep):
+                print(f"Reading line: {dep}")  # 输出每行内容进行调试
+                
+                # 过滤无关内容，确保是符合格式的依赖项（如 Flask==2.1.1）
+                if re.match(r'^[a-zA-Z0-9_-]+==[0-9\.]+$', dep):  # 仅提取符合格式的依赖项
                     print(f"Adding to dependencies: {dep}")
                     dependencies_layer.append(dep)
                 else:
-                    print(f"Skipping invalid line: {dep}")
+                    print(f"Skipping non-dependency line: {dep}")  # 输出被跳过的内容进行调试
 
     # 处理 package.json 文件
     package_json_path = os.path.join(folder_path, 'package.json')
@@ -57,14 +57,14 @@ def extract_requirements(dependencies_layer, folder_path):
                 print(f"Adding to dependencies: {dep.strip()}")
                 dependencies_layer.append(dep.strip())
 
-    # 最后过滤无效项
-    def is_valid_dependency(dep):
-        """检查依赖是否是合法的，不包含无效标记"""
-        invalid_keywords = ['requirements.txt', 'package.json', 'pom.xml', '@', '.xml']
-        return not any(keyword in dep.lower() for keyword in invalid_keywords)
+    # # 最后过滤无效项
+    # def is_valid_dependency(dep):
+    #     """检查依赖是否是合法的，不包含无效标记"""
+    #     invalid_keywords = ['requirements.txt', 'package.json', 'pom.xml', '@', '.xml']
+    #     return not any(keyword in dep.lower() for keyword in invalid_keywords)
 
-    #print(f"Filtering dependencies_layer before cleanup: {dependencies_layer}")
-    dependencies_layer[:] = [dep for dep in dependencies_layer if is_valid_dependency(dep)]
+    # #print(f"Filtering dependencies_layer before cleanup: {dependencies_layer}")
+    # dependencies_layer[:] = [dep for dep in dependencies_layer if is_valid_dependency(dep)]
     #print(f"Dependencies_layer after cleanup: {dependencies_layer}")
 
 
