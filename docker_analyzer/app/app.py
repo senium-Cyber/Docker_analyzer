@@ -118,6 +118,7 @@ def extract_layers(ast):
             for child in node.get('children', []):
                 if child['type'] == 'DOCKER-IMAGE-TAG' and not os_detected:
                     tag_value = child['value'].lower()
+                    os_list.append(tag_value)
                     # Store the tag value temporarily for later combination
                     detected_os_tag = tag_value
                     os_detected = True
