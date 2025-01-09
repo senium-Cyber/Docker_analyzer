@@ -194,7 +194,10 @@ def extract_layers(ast):
                     language_list.append('java')
                     language_detected = True
                 elif 'python' in run_command:
-                    language_list.append('python')
+                    if 'python3' in run_command:
+                        language_list.append('python3')
+                    else:
+                        language_list.append('python')
                     language_detected = True
                 elif 'python3' in run_command:
                     language_list.append('python3')
