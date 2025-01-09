@@ -208,13 +208,37 @@ def extract_layers(ast):
                 elif 'ruby' in run_command:
                     language_list.append('ruby')
                     language_detected = True
-                elif 'c' in run_command:
+                elif 'gcc' in  or 'g++' in run_command: run_command:
                     language_list.append('c')
                     language_detected = True
             # Extract dependencies from package installation commands
             if 'apt-get install' in run_command:
                 dependencies = re.findall(r'apt-get install\s+-y\s+([\w\s\-\.]+)', run_command)
                 dependencies_list.extend(dependencies)
+                # 检测可能的语言
+                for dep in dependencies:
+                    dep = dep.strip().lower()
+                    if 'python3' in dep or 'python' in dep:
+                        if 'python3-pip' in dep:  # 检查具体的 Python 工具链
+                            language_list.append('python3')
+                        else:
+                            language_list.append('python')
+                        language_detected = True
+                    elif 'nodejs' in dep or 'node' in dep:
+                        language_list.append('nodejs')
+                        language_detected = True
+                    elif 'openjdk' in dep or 'java' in dep:
+                        language_list.append('java')
+                        language_detected = True
+                    elif 'golang' in dep or 'go' in dep:
+                        language_list.append('golang')
+                        language_detected = True
+                    elif 'ruby' in dep:
+                        language_list.append('ruby')
+                        language_detected = True
+                    elif 'gcc' in dep or 'g++' in dep:
+                        language_list.append('c/c++')
+                        language_detected = True
             elif 'pip install' in run_command or 'pip3 install' in run_command:
                 dependencies = re.findall(r'pip(?:3)? install\s+([\w\s\-\.]+)', run_command)
                 dependencies_list.extend(dependencies)
