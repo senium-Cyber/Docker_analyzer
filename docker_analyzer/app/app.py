@@ -118,25 +118,9 @@ def extract_layers(ast):
             for child in node.get('children', []):
                 if child['type'] == 'DOCKER-IMAGE-TAG' and not os_detected:
                     tag_value = child['value'].lower()
-                    # Identify OS from tag (e.g., alpine, ubuntu)
-                    if 'alpine' in tag_value:
-                        os_list.append('alpine')
-                        os_detected = True
-                    elif 'ubuntu' in tag_value:
-                        os_list.append('ubuntu')
-                        os_detected = True
-                    elif 'debian' in tag_value:
-                        os_list.append('debian')
-                        os_detected = True
-                    elif 'slim' in tag_value:
-                        os_list.append('debian-slim')
-                        os_detected = True
-                    elif 'centos' in tag_value:
-                        os_list.append('centos')
-                        os_detected = True
-                    elif 'fedora' in tag_value:
-                        os_list.append('fedora')
-                        os_detected = True
+                    # Store the tag value temporarily for later combination
+                    detected_os_tag = tag_value
+                    os_detected = True
 
                 elif child['type'] == 'DOCKER-IMAGE-NAME' and not os_detected:
                     base_image = child['value'].lower()
