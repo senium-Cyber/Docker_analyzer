@@ -105,6 +105,8 @@ def process_dockerfile(dockerfile_path):
 # Tree traversal to extract OS, Language, and Dependencies
 # Tree traversal to extract OS, Language, and Dependencies
 
+import re
+
 def extract_layers(ast):
     os_list = []
     language_list = []
@@ -116,40 +118,72 @@ def extract_layers(ast):
 
         # Extract OS from 'DOCKER-FROM'
         if node['type'] == 'DOCKER-FROM':
+            os_detected = False
             for child in node.get('children', []):
+                if child['type'] == 'DOCKER-IMAGE-TAG' and not os_detected:
+                    tag_value = child['value'].lower()
+                    # Identify OS from tag (e.g., alpine, ubuntu)
+                    if 'alpine' in tag_value:
+                        os_list.append('alpine')
+                        os_detected = True
+                    elif 'ubuntu' in tag_value:
+                        os_list.append('ubuntu')
+                        os_detected = True
+                    elif 'debian' in tag_value:
+                        os_list.append('debian')
+                        os_detected = True
+                     elif 'slim' in tag_value:
+                        os_list.append('debian-slim')
+                        os_detected = True
+                    elif 'centos' in tag_value:
+                        os_list.append('centos')
+                        os_detected = True
+                    elif 'fedora' in tag_value:
+                        os_list.append('fedora')
+                        os_detected = True
+
+                elif child['type'] == 'DOCKER-IMAGE-NAME' and not os_detected:
+                    base_image = child['value'].lower()
+                    if base_image in ['alpine', 'ubuntu', 'debian', 'centos', 'fedora']:
+                        os_list.append(base_image)
+                        os_detected = True
+
+                # Detect language and version from base image
                 if child['type'] == 'DOCKER-IMAGE-NAME':
                     base_image = child['value'].lower()
-
-                    # Detect OS based on base image name or tag
-                    if 'alpine' in base_image or '-alpine' in base_image:
-                        os_list.append('alpine')
-                    elif 'ubuntu' in base_image or '-ubuntu' in base_image:
-                        os_list.append('ubuntu')
-                    elif 'debian' in base_image or '-debian' in base_image:
-                        os_list.append('debian')
-                    elif 'centos' in base_image or '-centos' in base_image:
-                        os_list.append('debian')
-
-                    # Detect language based on base image
                     if 'python' in base_image:
-                        language_list.append('python')
+                        # Combine with tag for version detection
+                        language_version = 'python'
+                        if 'DOCKER-IMAGE-TAG' in [c['type'] for c in node.get('children', [])]:
+                            tag_node = next(c for c in node['children'] if c['type'] == 'DOCKER-IMAGE-TAG')
+                            version = tag_node['value'].lower().split('-')[0]  # e.g., 3.9 from 3.9-alpine
+                            language_version += version
+                        language_list.append(language_version)
                         language_detected = True
                     elif 'node' in base_image:
-                        language_list.append('nodejs')
+                        language_version = 'nodejs'
+                        if 'DOCKER-IMAGE-TAG' in [c['type'] for c in node.get('children', [])]:
+                            tag_node = next(c for c in node['children'] if c['type'] == 'DOCKER-IMAGE-TAG')
+                            version = tag_node['value'].lower().split('-')[0]
+                            language_version += version
+                        language_list.append(language_version)
                         language_detected = True
                     elif 'openjdk' in base_image:
-                        language_list.append('java')
+                        language_version = 'java'
+                        if 'DOCKER-IMAGE-TAG' in [c['type'] for c in node.get('children', [])]:
+                            tag_node = next(c for c in node['children'] if c['type'] == 'DOCKER-IMAGE-TAG')
+                            version = tag_node['value'].lower().split('-')[0]
+                            language_version += version
+                        language_list.append(language_version)
                         language_detected = True
                     elif 'golang' in base_image:
-                        language_list.append('golang')
+                        language_version = 'golang'
+                        if 'DOCKER-IMAGE-TAG' in [c['type'] for c in node.get('children', [])]:
+                            tag_node = next(c for c in node['children'] if c['type'] == 'DOCKER-IMAGE-TAG')
+                            version = tag_node['value'].lower().split('-')[0]
+                            language_version += version
+                        language_list.append(language_version)
                         language_detected = True
-                    elif 'ruby' in base_image:
-                        language_list.append('ruby')
-                        language_detected = True
-                    elif 'gcc' in base_image:
-                        language_list.append('c')
-                        language_detected = True
-
         # Extract dependencies from 'DOCKER-RUN'
         elif node['type'] == 'DOCKER-RUN':
             run_command = node['children'][0]['value'].lower()
@@ -165,17 +199,16 @@ def extract_layers(ast):
                 elif 'node' in run_command:
                     language_list.append('nodejs')
                     language_detected = True
-                elif 'golang' in run_command:
+                elif 'golang' in env_value:
                     language_list.append('golang')
                     language_detected = True
-                elif 'ruby' in run_command:
+                elif 'ruby' in env_value:
                     language_list.append('ruby')
                     language_detected = True
-                elif 'gcc' in run_command or 'make' in run_command or 'cmake' in run_command:
+                elif 'c' in env_value:
                     language_list.append('c')
                     language_detected = True
-
-            # Extract dependencies from installation commands
+            # Extract dependencies from package installation commands
             if 'apt-get install' in run_command:
                 dependencies = re.findall(r'apt-get install\s+-y\s+([\w\s\-\.]+)', run_command)
                 dependencies_list.extend(dependencies)
@@ -188,29 +221,6 @@ def extract_layers(ast):
             elif 'gem install' in run_command:
                 dependencies = re.findall(r'gem install\s+([\w\s\-\.]+)', run_command)
                 dependencies_list.extend(dependencies)
-
-        # Extract language from 'DOCKER-ENV'
-        elif node['type'] == 'DOCKER-ENV':
-            env_value = node.get('value', '').lower()
-            if 'python' in env_value:
-                language_list.append('python')
-                language_detected = True
-            elif 'java' in env_value:
-                language_list.append('java')
-                language_detected = True
-            elif 'node' in env_value:
-                language_list.append('nodejs')
-                language_detected = True
-            elif 'golang' in env_value:
-                language_list.append('golang')
-                language_detected = True
-            elif 'ruby' in env_value:
-                language_list.append('ruby')
-                language_detected = True
-            elif 'c' in env_value:
-                language_list.append('c')
-                language_detected = True
-
         # Recursively traverse child nodes
         for child in node.get('children', []):
             traverse(child)
@@ -222,6 +232,7 @@ def extract_layers(ast):
         language_list.append('c')
 
     return os_list, language_list, dependencies_list
+
 
 
 
