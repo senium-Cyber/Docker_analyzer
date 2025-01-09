@@ -104,6 +104,7 @@ def process_dockerfile(dockerfile_path):
 
 # Tree traversal to extract OS, Language, and Dependencies
 # Tree traversal to extract OS, Language, and Dependencies
+
 def extract_layers(ast):
     os_list = []
     language_list = []
@@ -117,10 +118,21 @@ def extract_layers(ast):
         if node['type'] == 'DOCKER-FROM':
             for child in node.get('children', []):
                 if child['type'] == 'DOCKER-IMAGE-NAME':
-                    os_list.append(child['value'])
-
-                    # Detect language based on base image name
                     base_image = child['value'].lower()
+                    os_detected = False
+
+                    # Detect OS based on base image name
+                    if 'alpine' in base_image:
+                        os_list.append('alpine')
+                        os_detected = True
+                    elif 'ubuntu' in base_image:
+                        os_list.append('ubuntu')
+                        os_detected = True
+                    elif 'debian' in base_image:
+                        os_list.append('debian')
+                        os_detected = True
+
+                    # Detect language based on base image
                     if 'python' in base_image:
                         language_list.append('python')
                         language_detected = True
@@ -136,7 +148,7 @@ def extract_layers(ast):
                     elif 'ruby' in base_image:
                         language_list.append('ruby')
                         language_detected = True
-                    elif 'alpine' in base_image:
+                    elif 'gcc' in base_image or 'alpine' in base_image:
                         language_list.append('c')
                         language_detected = True
 
@@ -165,7 +177,7 @@ def extract_layers(ast):
                     language_list.append('c')
                     language_detected = True
 
-            # Extract dependencies from package installation commands
+            # Extract dependencies from installation commands
             if 'apt-get install' in run_command:
                 dependencies = re.findall(r'apt-get install\s+-y\s+([\w\s\-\.]+)', run_command)
                 dependencies_list.extend(dependencies)
@@ -177,7 +189,6 @@ def extract_layers(ast):
                 dependencies_list.extend(dependencies)
             elif 'gem install' in run_command:
                 dependencies = re.findall(r'gem install\s+([\w\s\-\.]+)', run_command)
-
                 dependencies_list.extend(dependencies)
 
         # Extract language from 'DOCKER-ENV'
@@ -185,16 +196,22 @@ def extract_layers(ast):
             env_value = node.get('value', '').lower()
             if 'python' in env_value:
                 language_list.append('python')
+                language_detected = True
             elif 'java' in env_value:
                 language_list.append('java')
+                language_detected = True
             elif 'node' in env_value:
                 language_list.append('nodejs')
+                language_detected = True
             elif 'golang' in env_value:
                 language_list.append('golang')
+                language_detected = True
             elif 'ruby' in env_value:
                 language_list.append('ruby')
+                language_detected = True
             elif 'c' in env_value:
                 language_list.append('c')
+                language_detected = True
 
         # Recursively traverse child nodes
         for child in node.get('children', []):
@@ -207,6 +224,7 @@ def extract_layers(ast):
         language_list.append('c')
 
     return os_list, language_list, dependencies_list
+
 
 
 # Main function to process Dockerfiles sequentially
