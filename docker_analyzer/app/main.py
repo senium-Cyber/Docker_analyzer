@@ -59,7 +59,6 @@ def extract_requirements(dependencies_layer, folder_path):
 
     # 最后过滤无效项
     def is_valid_dependency(dep):
-    """检查依赖是否是合法的，不包含无效标记"""
     # 定义无效关键字和无效模式
         invalid_keywords = [
             'requirements.txt', 'package.json', 'pom.xml', '@', '.xml', 
@@ -85,7 +84,7 @@ def extract_requirements(dependencies_layer, folder_path):
         return True
 
 # 清理 dependencies_layer
-dependencies_layer[:] = [dep for dep in dependencies_layer if is_valid_dependency(dep)]
+    dependencies_layer[:] = [dep for dep in dependencies_layer if is_valid_dependency(dep)]
 
 # 打印清理后的依赖
 #print(f"Dependencies_layer after cleanup: {dependencies_layer}")
