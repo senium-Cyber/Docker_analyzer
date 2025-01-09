@@ -119,29 +119,28 @@ def extract_layers(ast):
             for child in node.get('children', []):
                 if child['type'] == 'DOCKER-IMAGE-NAME':
                     base_image = child['value'].lower()
-                    os_detected = False
 
-                    # Detect OS based on base image name or tag
+                    # Detect OS based on base image name
                     if 'alpine' in base_image:
                         os_list.append('alpine')
-                        os_detected = True
                     elif 'ubuntu' in base_image:
                         os_list.append('ubuntu')
-                        os_detected = True
-                    elif 'debian' in base_image or 'bullseye' in base_image or 'buster' in base_image:
+                    elif 'debian' in base_image:
                         os_list.append('debian')
-                        os_detected = True
-
-                    # Additional logic to extract OS from the tag after '-'
-                    if not os_detected and '-' in base_image:
-                        tag_parts = base_image.split('-')
-                        if any(os_name in tag_parts[-1] for os_name in ['alpine', 'ubuntu', 'debian', 'bullseye', 'buster']):
-                            if 'alpine' in tag_parts[-1]:
-                                os_list.append('alpine')
-                            elif 'ubuntu' in tag_parts[-1]:
-                                os_list.append('ubuntu')
-                            elif 'debian' in tag_parts[-1] or 'bullseye' in tag_parts[-1] or 'buster' in tag_parts[-1]:
-                                os_list.append('debian')
+                    else:
+                        # Check the tag after '-'
+                        if '-' in base_image:
+                            tag_parts = base_image.split('-')
+                            for part in tag_parts:
+                                if 'alpine' in part:
+                                    os_list.append('alpine')
+                                    break
+                                elif 'ubuntu' in part:
+                                    os_list.append('ubuntu')
+                                    break
+                                elif 'debian' in part:
+                                    os_list.append('debian')
+                                    break
 
                     # Detect language based on base image
                     if 'python' in base_image:
@@ -159,7 +158,7 @@ def extract_layers(ast):
                     elif 'ruby' in base_image:
                         language_list.append('ruby')
                         language_detected = True
-                    elif 'gcc' in base_image or 'alpine' in base_image:
+                    elif 'gcc' in base_image:
                         language_list.append('c')
                         language_detected = True
 
@@ -235,6 +234,7 @@ def extract_layers(ast):
         language_list.append('c')
 
     return os_list, language_list, dependencies_list
+
 
 
 
