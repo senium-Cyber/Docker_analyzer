@@ -199,13 +199,13 @@ def extract_layers(ast):
                 elif 'node' in run_command:
                     language_list.append('nodejs')
                     language_detected = True
-                elif 'golang' in env_value:
+                elif 'golang' in run_command:
                     language_list.append('golang')
                     language_detected = True
-                elif 'ruby' in env_value:
+                elif 'ruby' in run_command:
                     language_list.append('ruby')
                     language_detected = True
-                elif 'c' in env_value:
+                elif 'c' in run_command:
                     language_list.append('c')
                     language_detected = True
             # Extract dependencies from package installation commands
