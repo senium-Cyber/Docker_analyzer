@@ -1,4 +1,4 @@
 Flask==2.3.3
 Werkzeug==2.3.6
 tqdm==4.66.1
-dockerfile==4.3.0
+dockerfile==3.4.0
