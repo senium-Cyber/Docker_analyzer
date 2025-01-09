@@ -61,28 +61,28 @@ def extract_requirements(dependencies_layer, folder_path):
     def is_valid_dependency(dep):
     """检查依赖是否是合法的，不包含无效标记"""
     # 定义无效关键字和无效模式
-    invalid_keywords = [
-        'requirements.txt', 'package.json', 'pom.xml', '@', '.xml', 
-        'python3', 'python3-pip', '--upgrade', '--no-cache-dir', '-y', 
-        'pip', 'apt', 'yum', 'apk', 'brew'
-    ]
-    invalid_patterns = [
-        r'^--.*',            # 过滤掉以 '--' 开头的标记，如 '--upgrade'
-        r'^-[a-zA-Z]+$',     # 过滤掉以 '-' 开头的单字符选项，如 '-y'
-        r'^\d+$',            # 过滤掉纯数字
-        r'^[^a-zA-Z0-9]+$',  # 过滤掉完全无意义的符号
-    ]
-    
-    # 检查是否包含无效关键字
-    if any(keyword in dep.lower() for keyword in invalid_keywords):
-        return False
-    
-    # 检查是否匹配无效模式
-    if any(re.match(pattern, dep) for pattern in invalid_patterns):
-        return False
-    
-    # 合法依赖
-    return True
+        invalid_keywords = [
+            'requirements.txt', 'package.json', 'pom.xml', '@', '.xml', 
+            'python3', 'python3-pip', '--upgrade', '--no-cache-dir', '-y', 
+            'pip', 'apt', 'yum', 'apk', 'brew'
+        ]
+        invalid_patterns = [
+            r'^--.*',            # 过滤掉以 '--' 开头的标记，如 '--upgrade'
+            r'^-[a-zA-Z]+$',     # 过滤掉以 '-' 开头的单字符选项，如 '-y'
+            r'^\d+$',            # 过滤掉纯数字
+            r'^[^a-zA-Z0-9]+$',  # 过滤掉完全无意义的符号
+        ]
+        
+        # 检查是否包含无效关键字
+        if any(keyword in dep.lower() for keyword in invalid_keywords):
+            return False
+        
+        # 检查是否匹配无效模式
+        if any(re.match(pattern, dep) for pattern in invalid_patterns):
+            return False
+        
+        # 合法依赖
+        return True
 
 # 清理 dependencies_layer
 dependencies_layer[:] = [dep for dep in dependencies_layer if is_valid_dependency(dep)]
