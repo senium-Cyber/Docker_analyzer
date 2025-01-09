@@ -10,6 +10,55 @@ UPLOAD_FOLDER = './app/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+def extract_requirements(dependencies_layer, folder_path):
+    """从 `requirements.txt`、`package.json` 和 `pom.xml` 提取依赖"""
+    
+    # 处理 requirements.txt 文件
+    requirements_path = os.path.join(folder_path, 'requirements.txt')  # 确保路径是正确的
+    if os.path.exists(requirements_path):
+        print(f"Found requirements.txt at {requirements_path}")
+        with open(requirements_path, 'r') as req_file:
+            dependencies = req_file.readlines()
+            for dep in dependencies:
+                dep = dep.strip()
+                print(f"Reading line: {dep}")  # 输出每行内容进行调试
+                
+                # 过滤无关内容，确保是符合格式的依赖项（如 Flask==2.1.1）
+                if re.match(r'^[a-zA-Z0-9_-]+==[0-9\.]+$', dep):  # 仅提取符合格式的依赖项
+                    print(f"Adding to dependencies: {dep}")
+                    dependencies_layer.append(dep)
+                else:
+                    print(f"Skipping non-dependency line: {dep}")  # 输出被跳过的内容进行调试
+
+    # 处理 package.json 文件
+    package_json_path = os.path.join(folder_path, 'package.json')
+    if os.path.exists(package_json_path):
+        print(f"Found package.json at {package_json_path}")
+        with open(package_json_path, 'r') as pkg_file:
+            try:
+                package_data = json.load(pkg_file)
+                if 'dependencies' in package_data:
+                    for dep, version in package_data['dependencies'].items():
+                        dep_str = f"{dep}@{version}"
+                        print(f"Adding to dependencies: {dep_str}")
+                        dependencies_layer.append(dep_str)
+            except json.JSONDecodeError:
+                print(f"Error parsing JSON in {package_json_path}")
+
+    # 处理 pom.xml 文件
+    pom_xml_path = os.path.join(folder_path, 'pom.xml')
+    if os.path.exists(pom_xml_path):
+        print(f"Found pom.xml at {pom_xml_path}")
+        with open(pom_xml_path, 'r') as pom_file:
+            pom_data = pom_file.read()
+            # 使用正则从 XML 文件中提取所有依赖项
+            dependencies = re.findall(r'<artifactId>(.*?)</artifactId>', pom_data)
+            for dep in dependencies:
+                print(f"Adding to dependencies: {dep.strip()}")
+                dependencies_layer.append(dep.strip())
+
+
+
 def get_files_from_folder(folder_path):
     """递归获取文件夹中的所有文件"""
     file_list = []
@@ -17,6 +66,7 @@ def get_files_from_folder(folder_path):
         for file in files:
             file_list.append(os.path.join(root, file))
     return file_list
+
 
 @app.route('/')
 def serve_frontend():
